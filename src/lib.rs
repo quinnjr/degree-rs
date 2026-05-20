@@ -5,8 +5,11 @@
 //!
 //! Based on the C++ implementation by movingpictures83/Degree
 
+use pluma_plugin_trait::PluMAPlugin;
+use std::ffi::CStr;
 use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Write};
+use std::os::raw::c_char;
 use std::path::Path;
 
 /// Degree centrality plugin
@@ -271,6 +274,78 @@ fn parse_float_fast(bytes: &[u8], start: usize, end: usize) -> f32 {
         s.parse().unwrap_or(0.0)
     } else {
         0.0
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PluMA plugin contract (pluma-plugin-trait + dlsym-resolved FFI shims)
+// ---------------------------------------------------------------------------
+
+impl PluMAPlugin for DegreePlugin {
+    fn input(&mut self, filepath: String) -> Result<(), Box<dyn std::error::Error>> {
+        DegreePlugin::input(self, &filepath).map_err(|e| e.into())
+    }
+    fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        DegreePlugin::run(self);
+        Ok(())
+    }
+    fn output(&mut self, filepath: String) -> Result<(), Box<dyn std::error::Error>> {
+        DegreePlugin::output(self, &filepath).map_err(|e| e.into())
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn Degree_plugin_create() -> *mut std::ffi::c_void {
+    Box::into_raw(Box::new(DegreePlugin::new())) as *mut std::ffi::c_void
+}
+
+#[no_mangle]
+pub extern "C" fn Degree_plugin_destroy(ptr: *mut std::ffi::c_void) {
+    if !ptr.is_null() {
+        unsafe {
+            let _ = Box::from_raw(ptr as *mut DegreePlugin);
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn Degree_plugin_input(ptr: *mut std::ffi::c_void, filename: *const c_char) {
+    if ptr.is_null() || filename.is_null() {
+        return;
+    }
+    unsafe {
+        let plugin = &mut *(ptr as *mut DegreePlugin);
+        let s = CStr::from_ptr(filename).to_str().unwrap_or("").to_string();
+        if let Err(e) = <DegreePlugin as PluMAPlugin>::input(plugin, s) {
+            eprintln!("[Degree] input error: {e}");
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn Degree_plugin_run(ptr: *mut std::ffi::c_void) {
+    if ptr.is_null() {
+        return;
+    }
+    unsafe {
+        let plugin = &mut *(ptr as *mut DegreePlugin);
+        if let Err(e) = <DegreePlugin as PluMAPlugin>::run(plugin) {
+            eprintln!("[Degree] run error: {e}");
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn Degree_plugin_output(ptr: *mut std::ffi::c_void, filename: *const c_char) {
+    if ptr.is_null() || filename.is_null() {
+        return;
+    }
+    unsafe {
+        let plugin = &mut *(ptr as *mut DegreePlugin);
+        let s = CStr::from_ptr(filename).to_str().unwrap_or("").to_string();
+        if let Err(e) = <DegreePlugin as PluMAPlugin>::output(plugin, s) {
+            eprintln!("[Degree] output error: {e}");
+        }
     }
 }
 
