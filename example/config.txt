@@ -1,0 +1,13 @@
+# Minimal PluMA pipeline that drives the Degree plugin against the synthetic
+# 40-node signed correlation network in this directory.
+#
+# Run from the degree-rs repo root:
+#
+#     pluma example/config.txt
+#
+# or via the convenience script (which also stages the .so and diffs the
+# output against expected_output.txt):
+#
+#     example/run_pluma_example.sh
+Prefix example/
+Plugin Degree  inputfile network.csv  outputfile out/degree.txt
